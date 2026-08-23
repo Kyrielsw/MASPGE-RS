@@ -1,0 +1,45 @@
+{
+  "schema_version": "1.0",
+  "dataset_id": "hai_23_05_role_state_v1",
+  "admission_audit": "data/hai_23_05_admission_v1.audit.json",
+  "raw_dir": "data/raw/hai_23_05",
+  "output": "data/hai_23_05_role_state_v1.npz",
+  "output_audit": "data/hai_23_05_role_state_v1.audit.json",
+  "resample_seconds": 10,
+  "history_steps": 60,
+  "horizon_steps": 15,
+  "unit_order": ["thermal", "hydro"],
+  "targets": {
+    "thermal": "P4_ST_PO",
+    "hydro": "P4_HT_PO"
+  },
+  "role_slots": {
+    "thermal": {
+      "A1_energy_input": ["P1_PIT01", "P1_TIT01", "P1_FT02Z", "P1_PIT02", "P1_TIT02", "P1_LIT01"],
+      "A2_conversion": ["P2_SIT01", "P2_SCST", "P2_SCO", "P4_ST_GOV", "P4_ST_PT01", "P4_ST_TT01"],
+      "A3_generation": ["P4_ST_LD", "P4_ST_PS", "P4_ST_FD", "P4_LD", "P4_ST_PO", null],
+      "A4_auxiliary": ["P1_PP04", "P1_PP04SP", "P1_TIT03", "P1_FT03Z", null, null]
+    },
+    "hydro": {
+      "A1_energy_input": ["P3_LIT01", "P3_PIT01", "P3_FIT01", "P4_LD", "P4_HT_PS", null],
+      "A2_conversion": ["P3_FIT01", "P3_PIT01", "P4_HT_FD", "P3_LIT01", null, null],
+      "A3_generation": ["P4_HT_PS", "P4_HT_FD", "P4_LD", "P4_HT_PO", null, null],
+      "A4_auxiliary": ["P3_LCP01D", "P3_LCV01D", null, null, null, null]
+    }
+  },
+  "context_columns": ["P4_LD"],
+  "split_files": {
+    "train": ["hai-train1.csv", "hai-train2.csv"],
+    "validation": ["hai-train3.csv"],
+    "holdout": ["hai-train4.csv"]
+  },
+  "protocol": {
+    "frozen_after_full_admission": true,
+    "normal_files_only": true,
+    "causal_imputation": "forward fill within each source file then training median",
+    "normalization": "training files only per named variable and per target",
+    "window_boundary": "no window may cross a source-file boundary",
+    "holdout_model_evaluated_during_preparation": false,
+    "coordinate_xy_semantics": "functional layout only, not geographical distance"
+  }
+}

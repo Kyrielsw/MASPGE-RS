@@ -1,0 +1,82 @@
+{
+  "schema_version": "1.0",
+  "run_name": "hai_external_baselines_v1",
+  "experiment": "Frozen five-seed power-only forecasting baselines on HAI 23.05",
+  "dataset": {
+    "loader": "hai",
+    "path": "data/hai_23_05_role_state_v1.npz",
+    "sha256": "266a98f5fff19ed07774279f8276f171e35d021abd2aefc360ba94c69c565be6",
+    "history_steps": 60,
+    "horizon_steps": 15,
+    "target": "two-unit training-standardized mean power over next 15 steps"
+  },
+  "seeds": [42, 43, 44, 45, 46],
+  "models": [
+    "dlinear_power",
+    "fouriergnn_power_official_small",
+    "itransformer_power",
+    "softs_power_compact"
+  ],
+  "model": {
+    "moving_average_kernel": 25,
+    "d_model": 64,
+    "n_heads": 4,
+    "layers": 2,
+    "feedforward_size": 128,
+    "dropout": 0.1,
+    "softs": {
+      "softs_power_compact": {
+        "d_model": 128,
+        "d_core": 32,
+        "layers": 3,
+        "feedforward_size": 128,
+        "dropout": 0.1
+      }
+    },
+    "fouriergnn": {
+      "fouriergnn_power_official_small": {
+        "embed_size": 256,
+        "hidden_size": 512,
+        "sparsity_threshold": 0.01
+      }
+    }
+  },
+  "data_loading": {
+    "train_windows": 57092,
+    "validation_windows": 12526,
+    "holdout_windows": 19726,
+    "batch_size": 32,
+    "num_workers": 2,
+    "log_every_batches": 100
+  },
+  "training_by_mode": {
+    "dlinear_power": {
+      "epochs": 12, "minimum_epochs": 6, "early_stopping_patience": 3,
+      "optimizer": "adamw", "learning_rate": 0.001, "weight_decay": 0.0001,
+      "gradient_clip_norm": 1.0
+    },
+    "itransformer_power": {
+      "epochs": 12, "minimum_epochs": 6, "early_stopping_patience": 3,
+      "optimizer": "adamw", "learning_rate": 0.001, "weight_decay": 0.0001,
+      "gradient_clip_norm": 1.0
+    },
+    "softs_power_compact": {
+      "epochs": 20, "minimum_epochs": 6, "early_stopping_patience": 4,
+      "optimizer": "adamw", "learning_rate": 0.0003, "weight_decay": 0.0001,
+      "gradient_clip_norm": 1.0
+    },
+    "fouriergnn_power_official_small": {
+      "epochs": 50, "minimum_epochs": 10, "early_stopping_patience": 8,
+      "optimizer": "rmsprop", "learning_rate": 0.00001, "weight_decay": 0.0,
+      "scheduler_step_epochs": 5, "scheduler_gamma": 0.5,
+      "gradient_clip_norm": 1.0
+    }
+  },
+  "selection": {
+    "criterion": "lowest joint standardized validation MSE per seed",
+    "hyperparameters_source": "frozen SMARTEOLE and SDWPF formal baselines",
+    "hai_hyperparameter_search": false,
+    "input_protocol": "power history only",
+    "holdout_policy": "separate frozen evaluator after all validation jobs"
+  }
+}

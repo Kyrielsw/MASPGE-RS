@@ -1,0 +1,48 @@
+{
+  "schema_version": "1.0",
+  "seeds": [42, 43, 44, 45, 46],
+  "model": {
+    "history_scales": [15, 30, 45, 60],
+    "horizon_scales": [4, 8, 12, 15],
+    "d_model": 64,
+    "n_heads": 4,
+    "layers": 2,
+    "feedforward_size": 128,
+    "dropout": 0.1,
+    "agent_loss_weight": 1.0,
+    "topology": "fully"
+  },
+  "datasets": {
+    "smarteole": {
+      "path": "data/s1_complete_case_v0.1.npz",
+      "sha256": "6433e89f3a29751eacea375f9cbc7fcd19bceed0dc59c74ddc7a2b27770bd466",
+      "history_steps": 60,
+      "horizon_steps": 15,
+      "train_windows": 81188,
+      "validation_windows": 17946,
+      "batch_size": 256,
+      "num_workers": 4,
+      "log_every_batches": 40,
+      "pretrain": {"epochs": 12, "minimum_epochs": 6, "early_stopping_patience": 3, "learning_rate": 0.001, "weight_decay": 0.0001, "gradient_clip_norm": 1.0},
+      "finetune": {"epochs": 8, "minimum_epochs": 4, "early_stopping_patience": 3, "learning_rate": 0.0001, "weight_decay": 0.0001, "gradient_clip_norm": 1.0}
+    },
+    "sdwpf": {
+      "path": "data/sdwpf_kdd_245days_role_state_v2.npz",
+      "sha256": "835e19d68b77903a3445a47d92be1f8bd38aaf04bf18ba7455b8d3d646ce9439",
+      "history_steps": 60,
+      "horizon_steps": 15,
+      "train_windows": 24550,
+      "validation_windows": 5254,
+      "batch_size": 128,
+      "num_workers": 4,
+      "log_every_batches": 25,
+      "pretrain": {"epochs": 10, "minimum_epochs": 6, "early_stopping_patience": 2, "learning_rate": 0.001, "weight_decay": 0.0001, "gradient_clip_norm": 1.0},
+      "finetune": {"epochs": 6, "minimum_epochs": 3, "early_stopping_patience": 2, "learning_rate": 0.0001, "weight_decay": 0.0001, "gradient_clip_norm": 1.0}
+    }
+  },
+  "protocol": {
+    "selection": "lowest validation MSE per seed",
+    "holdout_evaluated": false,
+    "purpose": "produce frozen Stage-II MAFS checkpoints for Role-State adaptation"
+  }
+}

@@ -1,0 +1,43 @@
+{
+  "schema_version": "1.0",
+  "run_name": "smarteole_timemixer_v1",
+  "experiment": "Frozen five-seed TimeMixer comparison on SMARTEOLE",
+  "dataset": {
+    "loader": "smarteole",
+    "path": "data/s1_complete_case_v0.1.npz",
+    "sha256": "6433e89f3a29751eacea375f9cbc7fcd19bceed0dc59c74ddc7a2b27770bd466",
+    "history_steps": 60,
+    "horizon_steps": 15,
+    "target": "mean_normalized_power_over_next_15_steps"
+  },
+  "seeds": [42, 43, 44, 45, 46],
+  "models": ["timemixer_power"],
+  "model": {
+    "moving_average_kernel": 25,
+    "timemixer": {
+      "d_model": 64, "d_ff": 128, "layers": 2,
+      "down_sampling_layers": 3, "down_sampling_window": 2,
+      "moving_average_kernel": 25, "dropout": 0.1,
+      "channel_independence": true, "prediction_length": 1
+    }
+  },
+  "data_loading": {
+    "train_windows": 81188, "validation_windows": 17946,
+    "holdout_windows": 16419, "batch_size": 256,
+    "num_workers": 4, "log_every_batches": 40
+  },
+  "training_by_mode": {
+    "timemixer_power": {
+      "epochs": 20, "minimum_epochs": 6, "early_stopping_patience": 4,
+      "optimizer": "adamw", "learning_rate": 0.001,
+      "weight_decay": 0.0001, "gradient_clip_norm": 1.0
+    }
+  },
+  "selection": {
+    "criterion": "lowest_validation_mse_per_seed",
+    "architecture_source": "TimeMixer ICLR 2024 PDM plus FMM",
+    "adaptation": "power-only channel-independent scalar future-window mean",
+    "holdout_policy": "separate frozen evaluator after all validation jobs",
+    "hyperparameter_search": false
+  }
+}

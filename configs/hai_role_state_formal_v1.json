@@ -1,0 +1,74 @@
+{
+  "schema_version": "1.0",
+  "run_name": "hai_role_state_formal_v1",
+  "experiment": "Strict validation-only MAFS Base to MASPGE-RS comparison on HAI 23.05",
+  "dataset": {
+    "path": "data/hai_23_05_role_state_v1.npz",
+    "dataset_id": "hai_23_05_role_state_v1",
+    "sha256": "266a98f5fff19ed07774279f8276f171e35d021abd2aefc360ba94c69c565be6",
+    "history_steps": 60,
+    "horizon_steps": 15,
+    "sampling_seconds": 10,
+    "unit_names": ["thermal", "hydro"]
+  },
+  "seeds": [42, 43, 44, 45, 46],
+  "model": {
+    "history_scales": [15, 30, 45, 60],
+    "horizon_scales": [4, 8, 12, 15],
+    "d_model": 64,
+    "n_heads": 4,
+    "layers": 2,
+    "feedforward_size": 128,
+    "dropout": 0.1,
+    "agent_loss_weight": 1.0,
+    "role_state_hidden_size": 16,
+    "topology": "fully"
+  },
+  "data_loading": {
+    "train_windows": 57092,
+    "validation_windows": 12526,
+    "batch_size": 128,
+    "num_workers": 4,
+    "log_every_batches": 50
+  },
+  "pretrain": {
+    "epochs": 10,
+    "minimum_epochs": 6,
+    "early_stopping_patience": 2,
+    "learning_rate": 0.001,
+    "weight_decay": 0.0001,
+    "gradient_clip_norm": 1.0
+  },
+  "finetune": {
+    "epochs": 6,
+    "minimum_epochs": 3,
+    "early_stopping_patience": 2,
+    "learning_rate": 0.0001,
+    "weight_decay": 0.0001,
+    "gradient_clip_norm": 1.0
+  },
+  "role_state": {
+    "epochs": 24,
+    "minimum_epochs": 6,
+    "early_stopping_patience": 4,
+    "learning_rate": 0.0005,
+    "weight_decay": 0.0001,
+    "gradient_clip_norm": 1.0,
+    "residual_l2_weight": 0.0001
+  },
+  "protocol": {
+    "architecture_source": "frozen SMARTEOLE and SDWPF MASPGE-RS",
+    "hyperparameter_search_on_hai": false,
+    "all_four_roles_active": true,
+    "training_order": "MAFS pretrain then adjacency finetune then frozen-base Role-State",
+    "validation_script_constructs_holdout": false,
+    "selection_metric": "joint standardized validation MSE",
+    "joint_physical_metric_reportable": false,
+    "holdout_status": "strict_unseen_until_validation_acceptance",
+    "acceptance": {
+      "minimum_seeds_beating_same_seed_mafs": 4,
+      "minimum_mean_relative_mse_gain": 0.01,
+      "maximum_role_state_rms": 1.0
+    }
+  }
+}

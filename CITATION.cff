@@ -1,0 +1,11 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite the associated paper after publication."
+title: "MASPGE-RS: Role-Conditioned Multi-Agent Forecasting for Heterogeneous Industrial Energy Systems"
+type: software
+authors:
+  - family-names: Lu
+    given-names: Shiven
+repository-code: "https://github.com/Kyrielsw/MASPGE-RS"
+version: 1.0.0
+date-released: 2026-08-23
+license: MIT

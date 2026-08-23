@@ -1,0 +1,47 @@
+{
+  "schema_version": "1.0",
+  "run_name": "smarteole_role_state_full_validation_v1",
+  "phase": "five_seed_full_training_validation_only_role_state",
+  "experiment": "Full-data five-seed per-unit role-state validation",
+  "dataset": {
+    "path": "data/s1_complete_case_v0.1.npz",
+    "sha256": "6433e89f3a29751eacea375f9cbc7fcd19bceed0dc59c74ddc7a2b27770bd466",
+    "history_steps": 60,
+    "horizon_steps": 15
+  },
+  "seeds": [42, 43, 44, 45, 46],
+  "base_checkpoint_root": "checkpoints/mafs_base_v1/smarteole",
+  "model": {
+    "history_scales": [15, 30, 45, 60],
+    "horizon_scales": [4, 8, 12, 15],
+    "d_model": 64,
+    "n_heads": 4,
+    "layers": 2,
+    "feedforward_size": 128,
+    "dropout": 0.1,
+    "role_state_hidden_size": 16,
+    "topology": "fully"
+  },
+  "data_loading": {
+    "train_windows": 81188,
+    "validation_windows": 17946,
+    "batch_size": 256,
+    "num_workers": 4,
+    "log_every_batches": 50
+  },
+  "role_state": {
+    "epochs": 24,
+    "minimum_epochs": 6,
+    "early_stopping_patience": 4,
+    "learning_rate": 0.0005,
+    "weight_decay": 0.0001,
+    "gradient_clip_norm": 1.0,
+    "residual_l2_weight": 0.0001
+  },
+  "selection": {
+    "holdout_policy": "forbidden",
+    "minimum_seeds_beating_same_checkpoint_base": 4,
+    "minimum_mean_relative_validation_mse_gain": 0.01,
+    "maximum_role_state_rms": 1.0
+  }
+}

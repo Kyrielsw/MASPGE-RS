@@ -1,0 +1,43 @@
+{
+  "schema_version": "1.0",
+  "run_name": "sdwpf_timemixer_v1",
+  "experiment": "Frozen five-seed TimeMixer comparison on SDWPF",
+  "dataset": {
+    "loader": "sdwpf",
+    "path": "data/sdwpf_kdd_245days_role_state_v2.npz",
+    "sha256": "835e19d68b77903a3445a47d92be1f8bd38aaf04bf18ba7455b8d3d646ce9439",
+    "history_steps": 60,
+    "horizon_steps": 15,
+    "target": "valid_mean_normalized_power_over_next_15_steps"
+  },
+  "seeds": [42, 43, 44, 45, 46],
+  "models": ["timemixer_power"],
+  "model": {
+    "moving_average_kernel": 25,
+    "timemixer": {
+      "d_model": 64, "d_ff": 128, "layers": 2,
+      "down_sampling_layers": 3, "down_sampling_window": 2,
+      "moving_average_kernel": 25, "dropout": 0.1,
+      "channel_independence": true, "prediction_length": 1
+    }
+  },
+  "data_loading": {
+    "train_windows": 24550, "validation_windows": 5254,
+    "holdout_windows": 5254, "batch_size": 32,
+    "num_workers": 2, "log_every_batches": 50
+  },
+  "training_by_mode": {
+    "timemixer_power": {
+      "epochs": 20, "minimum_epochs": 6, "early_stopping_patience": 4,
+      "optimizer": "adamw", "learning_rate": 0.001,
+      "weight_decay": 0.0001, "gradient_clip_norm": 1.0
+    }
+  },
+  "selection": {
+    "criterion": "lowest_validation_mse_per_seed",
+    "architecture_source": "TimeMixer ICLR 2024 PDM plus FMM",
+    "adaptation": "power-only channel-independent scalar future-window mean",
+    "holdout_policy": "separate frozen evaluator after all validation jobs",
+    "hyperparameter_search": false
+  }
+}

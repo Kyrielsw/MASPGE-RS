@@ -1,0 +1,39 @@
+{
+  "schema_version": "1.0",
+  "run_name": "sdwpf_role_state_holdout_v1",
+  "experiment": "One-shot frozen SDWPF holdout evaluation",
+  "dataset": {
+    "path": "data/sdwpf_kdd_245days_role_state_v2.npz",
+    "dataset_id": "sdwpf_kdd_245days_role_state_v2",
+    "history_steps": 60,
+    "horizon_steps": 15
+  },
+  "seeds": [42, 43, 44, 45, 46],
+  "checkpoint_sources": {
+    "base": "checkpoints/mafs_base_v1/sdwpf",
+    "role_state": "checkpoints/sdwpf_role_state_formal_v1",
+    "validation_results": "results/sdwpf_role_state_formal_v1"
+  },
+  "model": {
+    "history_scales": [15, 30, 45, 60],
+    "horizon_scales": [4, 8, 12, 15],
+    "d_model": 64,
+    "n_heads": 4,
+    "layers": 2,
+    "feedforward_size": 128,
+    "dropout": 0.1,
+    "role_state_hidden_size": 16,
+    "topology": "fully"
+  },
+  "data_loading": {
+    "holdout_windows": 5254,
+    "batch_size": 32,
+    "num_workers": 2
+  },
+  "protocol": {
+    "training_permitted": false,
+    "holdout_previously_observed_by_old_router": true,
+    "eligible_as_strict_unseen_test": false,
+    "report_only_no_post_holdout_tuning": true
+  }
+}

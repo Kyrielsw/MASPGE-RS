@@ -1,0 +1,54 @@
+{
+  "schema_version": "1.0",
+  "run_name": "sdwpf_role_state_formal_v1",
+  "experiment": "Frozen cross-dataset role-state confirmation on 134 SDWPF turbines",
+  "dataset": {
+    "path": "data/sdwpf_kdd_245days_role_state_v2.npz",
+    "dataset_id": "sdwpf_kdd_245days_role_state_v2",
+    "raw_csv_md5": "8f0cc58c4b0d0fb809824035d05b4e76",
+    "locations_md5": "08bccca55c6cb2c7066cf3adb4f7aae9",
+    "history_steps": 60,
+    "horizon_steps": 15,
+    "split_days": {"train": 171, "validation": 37, "holdout": 37}
+  },
+  "seeds": [42, 43, 44, 45, 46],
+  "base_checkpoint_root": "checkpoints/mafs_base_v1/sdwpf",
+  "model": {
+    "history_scales": [15, 30, 45, 60],
+    "horizon_scales": [4, 8, 12, 15],
+    "d_model": 64,
+    "n_heads": 4,
+    "layers": 2,
+    "feedforward_size": 128,
+    "dropout": 0.1,
+    "role_state_hidden_size": 16,
+    "topology": "fully"
+  },
+  "data_loading": {
+    "train_windows": 24550,
+    "validation_windows": 5254,
+    "holdout_windows": 5254,
+    "batch_size": 32,
+    "num_workers": 2,
+    "log_every_batches": 50
+  },
+  "role_state": {
+    "epochs": 24,
+    "minimum_epochs": 6,
+    "early_stopping_patience": 4,
+    "learning_rate": 0.0005,
+    "weight_decay": 0.0001,
+    "gradient_clip_norm": 1.0,
+    "residual_l2_weight": 0.0001
+  },
+  "protocol": {
+    "configuration_source": "SMARTEOLE experiments 040-042",
+    "architecture_and_hyperparameters_frozen_before_sdwpf_role_state_results": true,
+    "reuse_validation_selected_experiment_037_mafs_base": true,
+    "no_sdwpf_hyperparameter_search": true,
+    "holdout_policy": "train_adapter_select_on_validation_then_report_frozen_holdout_once",
+    "sdwpf_holdout_previously_observed_by_old_router": true,
+    "eligible_as_strict_unseen_test": false,
+    "report_only_no_post_holdout_tuning": true
+  }
+}

@@ -1,0 +1,50 @@
+{
+  "schema_version": "1.0",
+  "run_name": "external_baselines_v1_screen",
+  "experiment": "SMARTEOLE external baseline validation-only adaptation screen",
+  "dataset": {
+    "path": "data/s1_complete_case_v0.1.npz",
+    "sha256": "6433e89f3a29751eacea375f9cbc7fcd19bceed0dc59c74ddc7a2b27770bd466",
+    "history_steps": 60,
+    "horizon_steps": 15,
+    "target": "mean_normalized_power_over_next_15_steps"
+  },
+  "seed": 42,
+  "models": [
+    "dlinear_power",
+    "dlinear_fullinfo_adapted",
+    "itransformer_power",
+    "itransformer_fullinfo_adapted"
+  ],
+  "model": {
+    "moving_average_kernel": 25,
+    "d_model": 64,
+    "n_heads": 4,
+    "layers": 2,
+    "feedforward_size": 128,
+    "dropout": 0.1
+  },
+  "training": {
+    "train_windows": 20000,
+    "validation_windows": 17946,
+    "epochs": 12,
+    "minimum_epochs": 6,
+    "early_stopping_patience": 3,
+    "batch_size": 256,
+    "learning_rate": 0.001,
+    "weight_decay": 0.0001,
+    "gradient_clip_norm": 1.0,
+    "num_workers": 4,
+    "log_every_batches": 20
+  },
+  "selection": {
+    "criterion": "lowest_validation_mse",
+    "holdout_policy": "forbidden_in_experiment_028A",
+    "promotion_requires": [
+      "finite_training_and_validation_metrics",
+      "no_future_information",
+      "documented_input_protocol",
+      "architecture_core_preserved"
+    ]
+  }
+}

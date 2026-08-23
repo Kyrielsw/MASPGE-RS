@@ -1,0 +1,43 @@
+{
+  "schema_version": "1.0",
+  "run_name": "hai_timemixer_v1",
+  "experiment": "Frozen five-seed TimeMixer comparison on HAI 23.05",
+  "dataset": {
+    "loader": "hai",
+    "path": "data/hai_23_05_role_state_v1.npz",
+    "sha256": "266a98f5fff19ed07774279f8276f171e35d021abd2aefc360ba94c69c565be6",
+    "history_steps": 60,
+    "horizon_steps": 15,
+    "target": "two-unit training-standardized mean power over next 15 steps"
+  },
+  "seeds": [42, 43, 44, 45, 46],
+  "models": ["timemixer_power"],
+  "model": {
+    "moving_average_kernel": 25,
+    "timemixer": {
+      "d_model": 64, "d_ff": 128, "layers": 2,
+      "down_sampling_layers": 3, "down_sampling_window": 2,
+      "moving_average_kernel": 25, "dropout": 0.1,
+      "channel_independence": true, "prediction_length": 1
+    }
+  },
+  "data_loading": {
+    "train_windows": 57092, "validation_windows": 12526,
+    "holdout_windows": 19726, "batch_size": 32,
+    "num_workers": 2, "log_every_batches": 100
+  },
+  "training_by_mode": {
+    "timemixer_power": {
+      "epochs": 20, "minimum_epochs": 6, "early_stopping_patience": 4,
+      "optimizer": "adamw", "learning_rate": 0.001,
+      "weight_decay": 0.0001, "gradient_clip_norm": 1.0
+    }
+  },
+  "selection": {
+    "criterion": "lowest_validation_mse_per_seed",
+    "architecture_source": "TimeMixer ICLR 2024 PDM plus FMM",
+    "adaptation": "power-only channel-independent scalar future-window mean",
+    "holdout_policy": "separate frozen evaluator after all validation jobs",
+    "hyperparameter_search": false
+  }
+}

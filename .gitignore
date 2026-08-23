@@ -1,0 +1,16 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+.idea/
+.vscode/
+data/*.npz
+data/*.audit.json
+data/raw/
+checkpoints/
+logs/
+results/
+.env
+*.key
+*.pem

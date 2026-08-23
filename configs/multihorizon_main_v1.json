@@ -1,0 +1,96 @@
+{
+  "schema_version": "1.0",
+  "run_name": "multihorizon_main_v1",
+  "experiment": "Frozen short/base/long horizon comparison for SOFTS, MAFS Base and MASPGE-RS",
+  "seeds": [42, 43, 44, 45, 46],
+  "history_steps": 60,
+  "reference_horizon_steps": 15,
+  "new_horizons": [5, 30],
+  "horizon_scales": {
+    "5": [1, 2, 4, 5],
+    "15": [4, 8, 12, 15],
+    "30": [8, 15, 23, 30]
+  },
+  "datasets": {
+    "smarteole": {
+      "loader": "smarteole",
+      "path": "data/s1_complete_case_v0.1.npz",
+      "sha256": "6433e89f3a29751eacea375f9cbc7fcd19bceed0dc59c74ddc7a2b27770bd466",
+      "sampling_minutes": 1,
+      "data_loading": {
+        "train_windows": 81188, "validation_windows": 17946,
+        "holdout_windows": 16419, "batch_size": 256,
+        "num_workers": 4, "log_every_batches": 40
+      },
+      "pretrain": {
+        "epochs": 12, "minimum_epochs": 6, "early_stopping_patience": 3,
+        "learning_rate": 0.001, "weight_decay": 0.0001,
+        "gradient_clip_norm": 1.0
+      },
+      "finetune": {
+        "epochs": 8, "minimum_epochs": 4, "early_stopping_patience": 3,
+        "learning_rate": 0.0001, "weight_decay": 0.0001,
+        "gradient_clip_norm": 1.0
+      },
+      "role_state": {
+        "epochs": 24, "minimum_epochs": 6, "early_stopping_patience": 4,
+        "learning_rate": 0.0005, "weight_decay": 0.0001,
+        "gradient_clip_norm": 1.0, "residual_l2_weight": 0.0001
+      }
+    },
+    "sdwpf": {
+      "loader": "sdwpf",
+      "path": "data/sdwpf_kdd_245days_role_state_v2.npz",
+      "sha256": "835e19d68b77903a3445a47d92be1f8bd38aaf04bf18ba7455b8d3d646ce9439",
+      "dataset_id": "sdwpf_kdd_245days_role_state_v2",
+      "sampling_minutes": 10,
+      "data_loading": {
+        "train_windows": 24550, "validation_windows": 5254,
+        "holdout_windows": 5254, "batch_size": 32,
+        "num_workers": 2, "log_every_batches": 50
+      },
+      "pretrain": {
+        "epochs": 10, "minimum_epochs": 6, "early_stopping_patience": 2,
+        "learning_rate": 0.001, "weight_decay": 0.0001,
+        "gradient_clip_norm": 1.0
+      },
+      "finetune": {
+        "epochs": 6, "minimum_epochs": 3, "early_stopping_patience": 2,
+        "learning_rate": 0.0001, "weight_decay": 0.0001,
+        "gradient_clip_norm": 1.0
+      },
+      "role_state": {
+        "epochs": 24, "minimum_epochs": 6, "early_stopping_patience": 4,
+        "learning_rate": 0.0005, "weight_decay": 0.0001,
+        "gradient_clip_norm": 1.0, "residual_l2_weight": 0.0001
+      }
+    }
+  },
+  "model": {
+    "history_scales": [15, 30, 45, 60],
+    "d_model": 64, "n_heads": 4, "layers": 2,
+    "feedforward_size": 128, "dropout": 0.1,
+    "agent_loss_weight": 1.0,
+    "role_state_hidden_size": 16, "topology": "fully",
+    "softs": {
+      "d_model": 128, "d_core": 32, "layers": 3,
+      "feedforward_size": 128, "dropout": 0.1
+    }
+  },
+  "softs_training": {
+    "epochs": 20, "minimum_epochs": 6, "early_stopping_patience": 4,
+    "optimizer": "adamw", "learning_rate": 0.0003,
+    "weight_decay": 0.0001, "gradient_clip_norm": 1.0
+  },
+  "protocol": {
+    "methods": ["softs_power_compact", "mafs_adapted_fully", "maspge_rs"],
+    "base_15_step_results_reused": true,
+    "new_horizons_only": [5, 30],
+    "same_endpoints_within_each_dataset_horizon": true,
+    "short_horizon_uses_frozen_reference_endpoints": true,
+    "long_horizon_filters_run_or_split_boundaries": true,
+    "selection": "lowest validation mean-target MSE per seed",
+    "holdout_policy": "separate read-only evaluator after all validation jobs",
+    "post_holdout_tuning": false
+  }
+}

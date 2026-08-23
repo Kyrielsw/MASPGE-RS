@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "maspge-rs"
+version = "1.0.0"
+description = "Role-conditioned multi-agent forecasting for heterogeneous industrial energy systems"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+authors = [{name = "Shiven Lu"}]
+dependencies = ["numpy>=1.26,<3", "pandas>=2,<4", "torch>=2.2"]
+
+[project.optional-dependencies]
+test = ["pytest>=8,<10"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

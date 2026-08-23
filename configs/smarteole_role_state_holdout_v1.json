@@ -1,0 +1,41 @@
+{
+  "schema_version": "1.0",
+  "run_name": "smarteole_role_state_holdout_v1",
+  "experiment": "Frozen holdout report for Experiment 041 role-state checkpoints",
+  "dataset": {
+    "path": "data/s1_complete_case_v0.1.npz",
+    "sha256": "6433e89f3a29751eacea375f9cbc7fcd19bceed0dc59c74ddc7a2b27770bd466",
+    "history_steps": 60,
+    "horizon_steps": 15
+  },
+  "seeds": [42, 43, 44, 45, 46],
+  "model": {
+    "history_scales": [15, 30, 45, 60],
+    "horizon_scales": [4, 8, 12, 15],
+    "d_model": 64,
+    "n_heads": 4,
+    "layers": 2,
+    "feedforward_size": 128,
+    "dropout": 0.1,
+    "role_state_hidden_size": 16,
+    "topology": "fully"
+  },
+  "data_loading": {
+    "holdout_windows": 16419,
+    "batch_size": 256,
+    "num_workers": 4,
+    "log_every_batches": 20
+  },
+  "checkpoint_sources": {
+    "base": "checkpoints/mafs_base_v1/smarteole",
+    "role_state": "checkpoints/role_state_v1_full_validation"
+  },
+  "protocol": {
+    "configuration_frozen_by": ["experiment_040", "experiment_041"],
+    "training_permitted": false,
+    "checkpoint_selection": "best_validation_checkpoint_only",
+    "holdout_policy": "evaluate_each_frozen_checkpoint_once_and_report_regardless_of_outcome",
+    "smarteole_holdout_already_observed": true,
+    "eligible_as_strict_unseen_test": false
+  }
+}

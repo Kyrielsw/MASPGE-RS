@@ -1,0 +1,283 @@
+{
+  "schema_version": "0.1",
+  "status": "frozen_for_S1_acceptance",
+  "dataset_name": "SMARTEOLE Wind Farm Control open dataset v1.0",
+  "units": [
+    "SMV1",
+    "SMV2",
+    "SMV3",
+    "SMV4",
+    "SMV5",
+    "SMV6",
+    "SMV7"
+  ],
+  "raw_files": {
+    "scada": "data/SMARTEOLE/extracted/SMARTEOLE-WFC-open-dataset/SMARTEOLE_WakeSteering_SCADA_1minData.csv",
+    "control_log": "data/SMARTEOLE/extracted/SMARTEOLE-WFC-open-dataset/SMARTEOLE_WakeSteering_ControlLog_1minData.csv",
+    "windcube": "data/SMARTEOLE/extracted/SMARTEOLE-WFC-open-dataset/SMARTEOLE_WakeSteering_WindCube_1minData.csv",
+    "coordinates": "data/SMARTEOLE/extracted/SMARTEOLE-WFC-open-dataset/SMARTEOLE_WakeSteering_Coordinates_staticData.csv"
+  },
+  "sampling_seconds": 60,
+  "window": {
+    "history_steps": 60,
+    "horizon_steps": 15,
+    "target_aggregation": "mean_of_next_15_steps"
+  },
+  "split": {
+    "strategy": "chronological_complete_runs_by_window_capacity",
+    "ratios": [
+      0.7,
+      0.15,
+      0.15
+    ]
+  },
+  "complete_case": {
+    "require_all_56_scada_average_fields": true,
+    "require_all_context_fields": true,
+    "never_bridge_timestamp_gaps": true
+  },
+  "roles": {
+    "A1": {
+      "name": "energy_input_and_operating_condition",
+      "active": true,
+      "features": [
+        {
+          "name": "wind_speed",
+          "source": "wind_speed_{unit_number}_avg",
+          "transform": "identity",
+          "valid_range": [
+            0.0,
+            50.0
+          ]
+        },
+        {
+          "name": "wind_direction_sin",
+          "source": "wind_direction_{unit_number}_avg",
+          "transform": "sin_degrees",
+          "valid_range": [
+            0.0,
+            360.0
+          ]
+        },
+        {
+          "name": "wind_direction_cos",
+          "source": "wind_direction_{unit_number}_avg",
+          "transform": "cos_degrees",
+          "valid_range": [
+            0.0,
+            360.0
+          ]
+        },
+        {
+          "name": "wind_vane_sin",
+          "source": "wind_vane_{unit_number}_avg",
+          "transform": "sin_degrees",
+          "valid_range": [
+            -200.0,
+            200.0
+          ]
+        },
+        {
+          "name": "wind_vane_cos",
+          "source": "wind_vane_{unit_number}_avg",
+          "transform": "cos_degrees",
+          "valid_range": [
+            -200.0,
+            200.0
+          ]
+        },
+        {
+          "name": "ambient_temperature",
+          "source": "temperature_{unit_number}_avg",
+          "transform": "identity",
+          "valid_range": [
+            -30.0,
+            80.0
+          ]
+        }
+      ]
+    },
+    "A2": {
+      "name": "energy_conversion",
+      "active": true,
+      "features": [
+        {
+          "name": "blade_pitch_angle",
+          "source": "blade_1_pitch_angle_{unit_number}_avg",
+          "transform": "identity",
+          "valid_range": [
+            -10.0,
+            100.0
+          ]
+        },
+        {
+          "name": "generator_speed",
+          "source": "generator_speed_{unit_number}_avg",
+          "transform": "identity",
+          "valid_range": [
+            -10.0,
+            2500.0
+          ]
+        },
+        {
+          "name": "nacelle_position_sin",
+          "source": "nacelle_position_{unit_number}_avg",
+          "transform": "sin_degrees",
+          "valid_range": [
+            0.0,
+            360.0
+          ]
+        },
+        {
+          "name": "nacelle_position_cos",
+          "source": "nacelle_position_{unit_number}_avg",
+          "transform": "cos_degrees",
+          "valid_range": [
+            0.0,
+            360.0
+          ]
+        }
+      ]
+    },
+    "A3": {
+      "name": "generation_and_grid_interface",
+      "active": true,
+      "features": [
+        {
+          "name": "active_power",
+          "source": "active_power_{unit_number}_avg",
+          "transform": "identity",
+          "valid_range": [
+            -200.0,
+            2500.0
+          ]
+        },
+        {
+          "name": "derate",
+          "source": "derate_{unit_number}",
+          "transform": "identity",
+          "normalization": "passthrough",
+          "valid_range": [
+            0.0,
+            1.0
+          ]
+        }
+      ]
+    },
+    "A4": {
+      "name": "auxiliary_system",
+      "active": false,
+      "reason": "No defensible cooling, lubrication or hydraulic subsystem measurements.",
+      "features": []
+    }
+  },
+  "shared_context": [
+    {
+      "name": "windcube_ws_80",
+      "source_file": "windcube",
+      "source": "ws_avg_80",
+      "transform": "identity",
+      "valid_range": [
+        0.0,
+        50.0
+      ]
+    },
+    {
+      "name": "windcube_direction_sin_80",
+      "source_file": "windcube",
+      "source": "wa_80",
+      "transform": "sin_degrees",
+      "valid_range": [
+        0.0,
+        360.0
+      ]
+    },
+    {
+      "name": "windcube_direction_cos_80",
+      "source_file": "windcube",
+      "source": "wa_80",
+      "transform": "cos_degrees",
+      "valid_range": [
+        0.0,
+        360.0
+      ]
+    },
+    {
+      "name": "windcube_turbulence_intensity_80",
+      "source_file": "windcube",
+      "source": "ti_10min_80",
+      "transform": "identity",
+      "valid_range": [
+        0.0,
+        150.0
+      ]
+    },
+    {
+      "name": "windcube_availability_80",
+      "source_file": "windcube",
+      "source": "avail_80",
+      "transform": "identity",
+      "normalization": "passthrough",
+      "valid_range": [
+        0.0,
+        1.0
+      ]
+    },
+    {
+      "name": "smv6_yaw_offset",
+      "source_file": "control_log",
+      "source": "control_log_offset_avg",
+      "transform": "identity",
+      "valid_range": [
+        -30.0,
+        30.0
+      ]
+    },
+    {
+      "name": "smv6_yaw_offset_active",
+      "source_file": "control_log",
+      "source": "control_log_offset_active_avg",
+      "transform": "identity",
+      "normalization": "passthrough",
+      "valid_range": [
+        0.0,
+        1.0
+      ]
+    },
+    {
+      "name": "minute_of_day_sin",
+      "source_file": "timestamp",
+      "transform": "minute_of_day_sin"
+    },
+    {
+      "name": "minute_of_day_cos",
+      "source_file": "timestamp",
+      "transform": "minute_of_day_cos"
+    },
+    {
+      "name": "day_of_year_sin",
+      "source_file": "timestamp",
+      "transform": "day_of_year_sin"
+    },
+    {
+      "name": "day_of_year_cos",
+      "source_file": "timestamp",
+      "transform": "day_of_year_cos"
+    }
+  ],
+  "target": {
+    "name": "active_power",
+    "source": "active_power_{unit_number}_avg",
+    "aggregation": "mean_next_horizon"
+  },
+  "dynamic_candidate_graph": {
+    "coordinate_system": "Lambert-93 X east Y north",
+    "adjacency_convention": "candidate_edges[receiver, sender]",
+    "wind_direction_convention": "meteorological wind-from degrees clockwise from north",
+    "direction_source": "circular_mean_of_seven_scada_wind_directions",
+    "rotor_diameter_m": 82.0,
+    "maximum_distance_rotor_diameters": 15.0,
+    "half_angle_degrees": 15.0,
+    "threshold_status": "S1 feasibility values; not frozen final model hyperparameters"
+  }
+}

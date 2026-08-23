@@ -1,0 +1,95 @@
+{
+  "dataset_id": "hai_23_05_role_state_candidate_v1",
+  "source": "https://github.com/icsdataset/hai/tree/master/hai-23.05",
+  "license": "CC BY-SA 4.0",
+  "normal_files": [
+    "hai-train1.csv",
+    "hai-train2.csv",
+    "hai-train3.csv",
+    "hai-train4.csv"
+  ],
+  "timestamp_column": "timestamp",
+  "targets": {
+    "thermal": "P4_ST_PO",
+    "hydro": "P4_HT_PO"
+  },
+  "candidate_roles": {
+    "thermal": {
+      "A1_energy_input": [
+        "P1_PIT01",
+        "P1_TIT01",
+        "P1_FT02Z",
+        "P1_PIT02",
+        "P1_TIT02",
+        "P1_LIT01"
+      ],
+      "A2_conversion": [
+        "P2_SIT01",
+        "P2_SCST",
+        "P2_SCO",
+        "P4_ST_GOV",
+        "P4_ST_PT01",
+        "P4_ST_TT01"
+      ],
+      "A3_generation": [
+        "P4_ST_LD",
+        "P4_ST_PS",
+        "P4_ST_FD",
+        "P4_LD"
+      ],
+      "A4_auxiliary": [
+        "P1_PP04",
+        "P1_PP04SP",
+        "P1_TIT03",
+        "P1_FT03Z",
+        "P1_PP02R",
+        "P1_PP01AR"
+      ]
+    },
+    "hydro": {
+      "A1_energy_input": [
+        "P3_LIT01",
+        "P3_PIT01",
+        "P3_FIT01",
+        "P4_HT_PS",
+        "P4_LD"
+      ],
+      "A2_conversion": [
+        "P3_LIT01",
+        "P3_PIT01",
+        "P3_FIT01",
+        "P4_HT_FD"
+      ],
+      "A3_generation": [
+        "P4_HT_PS",
+        "P4_HT_FD",
+        "P4_LD"
+      ],
+      "A4_auxiliary": [
+        "P3_LCP01D",
+        "P3_LCV01D",
+        "P3_LH01",
+        "P3_LL01"
+      ]
+    }
+  },
+  "split_files": {
+    "train": ["hai-train1.csv", "hai-train2.csv"],
+    "validation": ["hai-train3.csv"],
+    "holdout": ["hai-train4.csv"]
+  },
+  "admission": {
+    "expected_sampling_seconds": 1,
+    "maximum_missing_fraction": 0.001,
+    "minimum_target_std": 0.001,
+    "minimum_varying_a4_tags": {
+      "thermal": 3,
+      "hydro": 2
+    },
+    "prohibit_attack_columns": true,
+    "holdout_policy": "audit_schema_and_distribution_only_no_model_evaluation"
+  },
+  "resampling_candidates_seconds": [5, 10],
+  "provisional_history_steps": 60,
+  "provisional_horizon_steps": 15
+}
