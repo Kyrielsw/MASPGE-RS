@@ -1,139 +1,254 @@
 # MASPGE-RS
 
-**Role-Conditioned Multi-Agent Forecasting for Heterogeneous Industrial Energy Systems**
+**Unit-wise Multivariate State-Augmented Collaborative Forecasting for
+Heterogeneous Energy Systems**
 
-MASPGE-RS maps heterogeneous sensor histories into four reusable functional
-roles and injects unit-wise, scale-aligned Role-State residuals into a frozen
-multi-agent forecasting backbone. The same model structure is used for wind
-farms and thermal/hydro energy processes; only sensor mappings and active-role
-masks change across datasets.
+MASPGE-RS is a PyTorch implementation for collaborative forecasting across
+multiple physical units. This repository provides data preparation tools,
+training and evaluation entry points, baseline implementations, and
+reproducible launchers for SMARTEOLE, SDWPF, and HAI 23.05.
 
-## Method at a glance
+## Repository layout
 
-```mermaid
-flowchart LR
-    X[Raw sensor history] --> C[A1-A4 role contract]
-    C --> U[Unit-wise role encoders]
-    U --> S[Scale-aligned Role-State residuals]
-    P[Power or target history] --> A[Multi-scale forecasting agents]
-    S --> A
-    A --> M[Inter-agent communication]
-    M --> V[Contextual voting]
-    V --> Y[Multi-step forecast]
+```text
+configs/       Dataset and experiment configurations
+data/          Data contracts and dataset-specific instructions
+docs/          Reproducibility notes
+scripts/       Preprocessing, training, evaluation, and aggregation commands
+src/maspge/    Models, data loaders, metrics, and baseline implementations
+tests/         Model and protocol tests
 ```
 
-- **A1:** energy input and operating conditions
-- **A2:** energy conversion
-- **A3:** generation and grid interface
-- **A4:** auxiliary systems
+Raw datasets, processed arrays, checkpoints, logs, and generated outputs are
+not tracked by Git.
 
-Missing roles and sensor slots are handled by frozen masks rather than by
-changing the architecture for each dataset.
+## Requirements
 
-## Repository scope
-
-This is a clean release of the final MASPGE-RS research line. It excludes
-discarded development branches such as field-level vote routing and HardTopK
-communication. It contains:
-
-- the MASPGE-RS model and adapted MAFS backbone;
-- deterministic data contracts for SMARTEOLE, SDWPF, and HAI 23.05;
-- validation-first training and read-only holdout evaluators;
-- external-baseline, multi-horizon, and structural-ablation entry points;
-- frozen paper-result CSV files and focused automated tests.
-
-Datasets, checkpoints, logs, and large generated outputs are not committed.
+- Linux is recommended for the provided shell launchers.
+- Python 3.10 or 3.11.
+- PyTorch compatible with the local CPU or CUDA installation.
+- Two CUDA GPUs for the parallel launchers. Individual jobs can run on one GPU
+  or CPU.
 
 ## Installation
 
-Python 3.10 or 3.11 is recommended.
-
 ```bash
+git clone https://github.com/Kyrielsw/MASPGE-RS.git
+cd MASPGE-RS
+
 python3 -m venv .venv
 source .venv/bin/activate
+
 python -m pip install --upgrade pip
 python -m pip install -r requirements.txt
+
 export PYTHONPATH="$PWD/src"
 python -m pytest -q
 ```
 
-For RTX 50-series GPUs, install a PyTorch build compatible with the local CUDA
-driver first. The frozen workstation run used PyTorch `2.11.0+cu128` on two
-RTX 5090 GPUs.
+For CUDA systems, install the PyTorch build recommended by the
+[official PyTorch selector](https://pytorch.org/get-started/locally/) before
+installing the remaining requirements. Export `PYTHONPATH` in every new shell.
 
 ## Data preparation
 
-Download the datasets from their official sources and follow
-[`data/README.md`](data/README.md). Verify hashes and tensor contracts before
-training:
+Detailed source links, expected file names, hashes, and split contracts are
+listed in [`data/README.md`](data/README.md).
+
+### SMARTEOLE
+
+Download and extract the official archive to the paths specified in
+`configs/smarteole_role_contract_v1.json`, then run:
 
 ```bash
+python scripts/prepare_smarteole.py
 python scripts/verify_setup.py
-python scripts/verify_sdwpf_role_state_setup.py
+```
+
+The processed contract is written to:
+
+```text
+data/s1_complete_case_v0.1.npz
+```
+
+### SDWPF
+
+Download the public 245-day training file and turbine-location table:
+
+```bash
+bash scripts/download_sdwpf_kdd.sh
+```
+
+Create the dense per-turbine state contract:
+
+```bash
+python -u scripts/prepare_sdwpf.py \
+  --contract dense_role_v2 \
+  --csv data/raw/sdwpf_kddcup/sdwpf_245days_v1.csv \
+  --locations data/raw/sdwpf_kddcup/sdwpf_baidukddcup2022_turb_location.csv
+```
+
+See [`data/SDWPF_README.md`](data/SDWPF_README.md) for the complete contract.
+
+### HAI 23.05
+
+Download and audit the four normal-operation files:
+
+```bash
+mkdir -p logs
+
+bash scripts/download_hai_23_05.sh \
+  2>&1 | tee logs/hai_23_05_download_audit.log
+```
+
+Create and verify the processed thermal/hydro contract:
+
+```bash
+python -u scripts/prepare_hai_23_05.py \
+  2>&1 | tee logs/hai_23_05_prepare.log
+
 python scripts/verify_hai_role_state_setup.py
 ```
 
-## Core training pipeline
+See [`data/HAI_README.md`](data/HAI_README.md) for the admission audit and raw
+directory structure.
 
-MASPGE-RS follows three stages: multi-scale agent specialization, inter-agent
-communication/voting, and frozen-backbone Role-State adaptation.
+## Quick smoke tests
+
+Run the automated tests before training:
 
 ```bash
-# Produce validation-selected Stage-II MAFS bases for SMARTEOLE and SDWPF
-bash scripts/run_mafs_base_2gpu.sh
+export PYTHONPATH="$PWD/src"
+python -m pytest -q
+```
 
-# SMARTEOLE: five-seed full validation
+Check the MAFS training path on one GPU with a reduced workload:
+
+```bash
+CUDA_VISIBLE_DEVICES=0 python -u scripts/run_mafs_base.py \
+  --dataset smarteole \
+  --seed 42 \
+  --device cuda \
+  --smoke
+```
+
+Check the complete HAI training path:
+
+```bash
+CUDA_VISIBLE_DEVICES=0 python -u scripts/run_hai_role_state_formal.py \
+  --seed 42 \
+  --device cuda \
+  --smoke \
+  2>&1 | tee logs/hai_role_state_smoke_seed42.log
+```
+
+Use `--device cpu` for a CPU-only structural check. Smoke outputs are stored in
+separate directories and are not used by full runs.
+
+## Training
+
+### Stage 1: base forecasting models
+
+SMARTEOLE and SDWPF use validation-selected MAFS base checkpoints:
+
+```bash
+bash scripts/run_mafs_base_2gpu.sh
+```
+
+To run one dataset and seed on a single GPU:
+
+```bash
+CUDA_VISIBLE_DEVICES=0 python -u scripts/run_mafs_base.py \
+  --dataset smarteole \
+  --seed 42 \
+  --device cuda \
+  --resume
+```
+
+### Stage 2: state-augmented models
+
+After preparing the datasets and required base checkpoints, run the
+dataset-specific validation launchers:
+
+```bash
+# SMARTEOLE
 bash scripts/run_role_state_full_validation_2gpu.sh
 
-# SDWPF: five-seed cross-dataset validation
+# SDWPF
 bash scripts/run_sdwpf_role_state_formal_2gpu.sh
 
-# HAI: five-seed validation with A1-A4 active
+# HAI 23.05
 bash scripts/run_hai_role_state_validation_2gpu.sh
 ```
 
-The launchers stream progress, are restart-safe, and write JSON results and
-best-validation checkpoints under ignored directories. Holdout evaluation is
-kept in separate scripts with no training path.
+The launchers distribute five seeds between `CUDA_VISIBLE_DEVICES=0` and
+`CUDA_VISIBLE_DEVICES=1`, stream progress to `logs/`, and skip completed jobs
+when restarted.
 
-## Structural ablation
-
-The frozen ablation matrix tests the final method directly:
-
-- `w/o Unit-wise`: all units receive the same unit-average role state;
-- `w/o Scale Alignment`: every expert receives the full role-history window;
-- `w/o A4`: HAI auxiliary-role conditioning is disabled while parameter slots
-  are preserved.
+For a long-running job, redirect the master output while retaining the
+per-GPU logs created by the launcher:
 
 ```bash
-bash scripts/run_role_state_ablation_v1_2gpu.sh
+nohup bash scripts/run_hai_role_state_validation_2gpu.sh \
+  > logs/hai_role_state_validation_master.log 2>&1 &
+
+echo $!
+tail -f logs/hai_role_state_validation_master.log
 ```
 
-## Frozen main results
+## Evaluation
 
-Five-seed mean MSE values are summarized below. Full MSE/MAE values and
-standard deviations are stored in
-[`paper_results/main_results.csv`](paper_results/main_results.csv).
+Training and evaluation are separate. Complete the validation run first, keep
+its selected checkpoints unchanged, and then use the matching read-only
+evaluation launcher:
 
-| Method | SMARTEOLE | SDWPF | HAI |
-|---|---:|---:|---:|
-| iTransformer | 0.022912 | 0.144227 | 0.008582 |
-| SOFTS | 0.022541 | 0.137760 | 0.008588 |
-| TimeMixer | 0.023453 | 0.152861 | 0.008620 |
-| MAFS (adapted) | 0.022257 | 0.134618 | 0.007650 |
-| **MASPGE-RS** | **0.021954** | **0.126167** | **0.005958** |
+```bash
+# SMARTEOLE
+bash scripts/run_role_state_holdout_2gpu.sh
 
-MASPGE-RS reduces MSE relative to the same adapted MAFS backbone by 1.36%,
-6.28%, and 22.12% on SMARTEOLE, SDWPF, and HAI. These are experimental
-results, not a claim of statistical significance. SMARTEOLE and SDWPF
-holdouts were observed during earlier development; HAI provides the strongest
-frozen holdout evidence. See
-[`docs/REPRODUCIBILITY.md`](docs/REPRODUCIBILITY.md) for the full boundary.
+# SDWPF
+bash scripts/run_sdwpf_role_state_holdout_2gpu.sh
+
+# HAI 23.05
+bash scripts/run_hai_role_state_holdout_2gpu.sh
+```
+
+The evaluation scripts load frozen checkpoints and do not contain an optimizer
+or training path.
+
+## Optional workflows
+
+The repository also includes runnable workflows for:
+
+```text
+scripts/run_role_state_ablation_v1_2gpu.sh           Structural ablations
+scripts/run_multihorizon_validation_2gpu.sh          Multi-horizon validation
+scripts/run_multihorizon_holdout_2gpu.sh             Frozen multi-horizon evaluation
+scripts/run_hai_external_baseline_validation_2gpu.sh External baseline validation
+scripts/run_hai_external_baseline_holdout_2gpu.sh    Frozen baseline evaluation
+scripts/run_timemixer_validation_2gpu.sh              TimeMixer validation
+scripts/run_timemixer_holdout_2gpu.sh                 Frozen TimeMixer evaluation
+```
+
+Check the corresponding configuration under `configs/` before launching an
+optional workflow.
+
+## Outputs
+
+Generated artifacts follow the same directory convention across workflows:
+
+```text
+checkpoints/<experiment>/...   Validation-selected model checkpoints
+results/<experiment>/...       Per-seed JSON files and aggregate summaries
+logs/...                       Live progress and aggregation logs
+```
+
+Preserve the configuration, processed-data contract, and checkpoint directory
+together when moving an experiment between machines.
 
 ## License and citation
 
-MASPGE-RS is released under the MIT License. Adapted baseline components retain
-their original notices under [`licenses/`](licenses/) and are documented in
-[`THIRD_PARTY.md`](THIRD_PARTY.md). Dataset licenses are independent of the
-software license. A provisional citation is provided in
-[`CITATION.cff`](CITATION.cff) and will be updated after publication.
+MASPGE-RS is released under the [MIT License](LICENSE). Third-party notices are
+listed in [`THIRD_PARTY.md`](THIRD_PARTY.md) and [`licenses/`](licenses/).
+Dataset licenses are governed by their official sources. Citation metadata is
+provided in [`CITATION.cff`](CITATION.cff).
