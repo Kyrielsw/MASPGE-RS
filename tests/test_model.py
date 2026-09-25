@@ -10,7 +10,8 @@ def build_model() -> MAFSAdaptedPower:
         history_scales=(2, 4), horizon_scales=(1, 2), unit_count=3,
         full_horizon_steps=2, d_model=8, n_heads=2, layers=1,
         feedforward_size=16, dropout=0.0, topology="fully",
-        role_feature_counts=(2, 2, 2, 2), role_state_hidden_size=3,
+        role_feature_counts=(2, 2, 2, 2), context_size=5,
+        router_hidden_size=3, role_state_hidden_size=3,
     )
 
 

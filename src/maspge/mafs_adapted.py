@@ -188,7 +188,8 @@ class PerUnitRoleStateAdapter(nn.Module):
                 "per-unit role state requires x_role shaped [B,H,U,R,F]"
             )
         if ablation_mode not in {
-            "full", "shared_units", "unscaled_history", "without_a4"
+            "full", "shared_units", "unscaled_history",
+            "without_a1", "without_a2", "without_a3", "without_a4",
         }:
             raise ValueError(
                 f"unknown role-state ablation mode: {ablation_mode}"
@@ -213,7 +214,11 @@ class PerUnitRoleStateAdapter(nn.Module):
             history = adapter_input[:, -selected_steps:]
             for role_index in self.active_role_indices:
                 feature_count = self.role_feature_counts[role_index]
-                if ablation_mode == "without_a4" and role_index == 3:
+                masked_role = (
+                    int(ablation_mode[-1]) - 1
+                    if ablation_mode.startswith("without_a") else None
+                )
+                if role_index == masked_role:
                     role_states.append(
                         torch.zeros(
                             batch, units,
@@ -239,6 +244,123 @@ class PerUnitRoleStateAdapter(nn.Module):
         return outputs
 
 
+class PerUnitGenericStateAdapter(nn.Module):
+    """Encode all valid sensors of each unit without A1--A4 factorization.
+
+    This control preserves the unit axis, multi-scale histories, zero-initialized
+    pre-communication residual injection, sensor values, and frozen MAFS
+    backbone used by :class:`PerUnitRoleStateAdapter`.  Its sole encoder at each
+    scale receives the concatenation of every valid role slot, so the network
+    does not contain role-specific encoders or role-wise fusion.
+    """
+
+    def __init__(
+        self,
+        *,
+        history_scales: tuple[int, ...],
+        role_feature_counts: tuple[int, ...],
+        state_hidden_size: int,
+        d_model: int,
+        residual_initialization: str = "zero",
+        residual_initialization_std: float = 1e-3,
+    ) -> None:
+        super().__init__()
+        self.history_scales = tuple(int(value) for value in history_scales)
+        self.role_feature_counts = tuple(
+            int(value) for value in role_feature_counts
+        )
+        self.total_feature_count = sum(self.role_feature_counts)
+        self.residual_initialization = str(residual_initialization)
+        self.residual_initialization_std = float(residual_initialization_std)
+        if self.residual_initialization not in {"zero", "small_random", "default"}:
+            raise ValueError(
+                "residual_initialization must be zero, small_random, or default"
+            )
+        if self.total_feature_count <= 0:
+            raise ValueError("generic-state adapter requires valid sensors")
+        if state_hidden_size <= 0:
+            raise ValueError("state_hidden_size must be positive")
+        self.encoders = nn.ModuleList()
+        self.fusions = nn.ModuleList()
+        self.residual_projections = nn.ModuleList()
+        for _ in self.history_scales:
+            self.encoders.append(
+                nn.GRU(
+                    input_size=self.total_feature_count,
+                    hidden_size=int(state_hidden_size),
+                    batch_first=True,
+                )
+            )
+            self.fusions.append(
+                nn.Sequential(
+                    nn.Linear(int(state_hidden_size), d_model),
+                    nn.GELU(),
+                    nn.LayerNorm(d_model),
+                )
+            )
+            residual = nn.Linear(d_model, d_model)
+            self.residual_projections.append(residual)
+        # Apply the controlled projection initialization only after every GRU
+        # and fusion module has been constructed. This keeps all upstream
+        # parameters bitwise matched between zero and small-random variants.
+        if self.residual_initialization != "default":
+            for residual in self.residual_projections:
+                if self.residual_initialization == "zero":
+                    nn.init.zeros_(residual.weight)
+                else:
+                    nn.init.normal_(
+                        residual.weight,
+                        mean=0.0,
+                        std=self.residual_initialization_std,
+                    )
+                nn.init.zeros_(residual.bias)
+
+    def flatten_valid_sensors(self, x_role: torch.Tensor) -> torch.Tensor:
+        if x_role.ndim != 5:
+            raise ValueError(
+                "per-unit generic state requires x_role shaped [B,H,U,R,F]"
+            )
+        if x_role.shape[3] != len(self.role_feature_counts):
+            raise ValueError("role axis does not match feature-count contract")
+        pieces = [
+            x_role[:, :, :, role_index, :feature_count]
+            for role_index, feature_count in enumerate(self.role_feature_counts)
+            if feature_count > 0
+        ]
+        return torch.nan_to_num(
+            torch.cat(pieces, dim=-1), nan=0.0, posinf=0.0, neginf=0.0
+        )
+
+    def forward(
+        self,
+        x_role: torch.Tensor,
+        *,
+        ablation_mode: str = "full",
+        unit_state_mode: str = "unitwise",
+    ) -> list[torch.Tensor]:
+        if ablation_mode != "full":
+            raise ValueError(
+                "generic-state control supports only ablation_mode='full'"
+            )
+        flat = self.flatten_valid_sensors(x_role)
+        if unit_state_mode == "pooled_broadcast":
+            flat = flat.mean(dim=2, keepdim=True).expand_as(flat)
+        elif unit_state_mode != "unitwise":
+            raise ValueError(
+                "unit_state_mode must be unitwise or pooled_broadcast"
+            )
+        batch, _, units, _ = flat.shape
+        outputs = []
+        for index, history_steps in enumerate(self.history_scales):
+            sequence = flat[:, -history_steps:].permute(0, 2, 1, 3).reshape(
+                batch * units, history_steps, self.total_feature_count
+            )
+            _, hidden = self.encoders[index](sequence)
+            fused = self.fusions[index](hidden[-1].reshape(batch, units, -1))
+            outputs.append(self.residual_projections[index](fused))
+        return outputs
+
+
 class MAFSAdaptedPower(nn.Module):
     """Four multi-scale agents with MAFS communication and voting."""
 
@@ -256,6 +378,8 @@ class MAFSAdaptedPower(nn.Module):
         dropout: float,
         topology: str = "fully",
         role_feature_counts: tuple[int, ...] | None = None,
+        context_size: int | None = None,
+        router_hidden_size: int = 0,
         role_state_hidden_size: int = 0,
     ) -> None:
         super().__init__()
@@ -299,7 +423,44 @@ class MAFSAdaptedPower(nn.Module):
             self.full_history_steps, self.agent_count
         )
         self.final_projection = nn.Linear(d_model, self.full_horizon_steps)
+        self.role_router: nn.Module | None = None
+        self.role_temporal_embeddings = nn.ModuleDict()
+        self.router_context_embedding: nn.Module | None = None
         self.role_state_adapter: PerUnitRoleStateAdapter | None = None
+        if role_feature_counts is not None:
+            self.active_role_indices = tuple(
+                index
+                for index, count in enumerate(role_feature_counts)
+                if int(count) > 0
+            )
+            if not self.active_role_indices or context_size is None:
+                raise ValueError("role routing requires active roles and context")
+            if router_hidden_size <= 0:
+                raise ValueError("router_hidden_size must be positive")
+            self.role_feature_counts = tuple(int(x) for x in role_feature_counts)
+            self.role_temporal_embeddings = nn.ModuleDict(
+                {
+                    str(index): nn.Linear(
+                        self.full_history_steps, router_hidden_size
+                    )
+                    for index in self.active_role_indices
+                }
+            )
+            self.router_context_embedding = nn.Linear(
+                self.full_history_steps, router_hidden_size
+            )
+            self.role_router = nn.Sequential(
+                nn.Linear(
+                    (len(self.active_role_indices) + 1) * router_hidden_size,
+                    router_hidden_size,
+                ),
+                nn.GELU(),
+                nn.Linear(router_hidden_size, self.agent_count),
+            )
+            final_router = self.role_router[-1]
+            assert isinstance(final_router, nn.Linear)
+            nn.init.zeros_(final_router.weight)
+            nn.init.zeros_(final_router.bias)
         if role_state_hidden_size > 0:
             if role_feature_counts is None:
                 raise ValueError(
@@ -317,6 +478,22 @@ class MAFSAdaptedPower(nn.Module):
             for parameter in agent.parameters():
                 parameter.requires_grad = False
 
+    def freeze_for_role_routing(self) -> None:
+        """Freeze the complete MAFS base and train only the role router."""
+
+        if self.role_router is None:
+            raise RuntimeError("this MAFS model has no role router")
+        for parameter in self.parameters():
+            parameter.requires_grad = False
+        for module in (
+            self.role_temporal_embeddings,
+            self.router_context_embedding,
+            self.role_router,
+        ):
+            assert module is not None
+            for parameter in module.parameters():
+                parameter.requires_grad = True
+
     def freeze_for_role_state(self) -> None:
         """Freeze the MAFS base and train only per-unit role conditioning."""
 
@@ -327,14 +504,58 @@ class MAFSAdaptedPower(nn.Module):
         for parameter in self.role_state_adapter.parameters():
             parameter.requires_grad = True
 
+    def role_route_logits(
+        self,
+        x_role: torch.Tensor,
+        context: torch.Tensor,
+        *,
+        router_input_mode: str = "full",
+    ) -> torch.Tensor:
+        if self.role_router is None or self.router_context_embedding is None:
+            raise RuntimeError("role router is not configured")
+        if router_input_mode not in {
+            "full", "roles_only", "context_only", "constant"
+        }:
+            raise ValueError(f"unknown router input mode: {router_input_mode}")
+        summaries = []
+        for role_index in self.active_role_indices:
+            feature_count = self.role_feature_counts[role_index]
+            if x_role.ndim == 3:
+                temporal = x_role[:, :, role_index]
+            elif x_role.ndim == 5:
+                temporal = x_role[:, :, :, role_index, :feature_count].mean(
+                    dim=(2, 3)
+                )
+            else:
+                raise ValueError(
+                    "x_role must be compact [B,H,R] or dense [B,H,U,R,F]"
+                )
+            embedded = self.role_temporal_embeddings[str(role_index)](temporal)
+            if router_input_mode in {"context_only", "constant"}:
+                embedded = torch.zeros_like(embedded)
+            summaries.append(embedded)
+        context_temporal = context.mean(dim=-1)
+        embedded_context = self.router_context_embedding(context_temporal)
+        if router_input_mode in {"roles_only", "constant"}:
+            embedded_context = torch.zeros_like(embedded_context)
+        summaries.append(embedded_context)
+        return self.role_router(torch.cat(summaries, dim=-1))
+
     def forward(
         self,
         power_history: torch.Tensor,
         *,
         finetune: bool,
         x_role: torch.Tensor | None = None,
+        context: torch.Tensor | None = None,
+        use_role_router: bool = False,
+        router_input_mode: str = "full",
         use_role_state: bool = False,
         role_state_ablation_mode: str = "full",
+        generic_state_mode: str = "unitwise",
+        role_state_injection: str = "pre_communication",
+        role_state_unit_shift: int = 0,
+        return_communication_trace: bool = False,
     ) -> dict[str, torch.Tensor | list[torch.Tensor]]:
         if power_history.shape[1] != self.full_history_steps:
             raise ValueError("unexpected MAFS history length")
@@ -344,19 +565,46 @@ class MAFSAdaptedPower(nn.Module):
         if use_role_state:
             if self.role_state_adapter is None or x_role is None:
                 raise ValueError("role-state conditioning requires dense x_role")
-            role_state_residuals = self.role_state_adapter(
-                x_role, ablation_mode=role_state_ablation_mode
-            )
-            states = [
-                state + residual
-                for state, residual in zip(states, role_state_residuals)
-            ]
+            if isinstance(self.role_state_adapter, PerUnitGenericStateAdapter):
+                role_state_residuals = self.role_state_adapter(
+                    x_role,
+                    ablation_mode=role_state_ablation_mode,
+                    unit_state_mode=generic_state_mode,
+                )
+            else:
+                if generic_state_mode != "unitwise":
+                    raise ValueError(
+                        "generic_state_mode applies only to the generic adapter"
+                    )
+                role_state_residuals = self.role_state_adapter(
+                    x_role, ablation_mode=role_state_ablation_mode
+                )
+            if role_state_unit_shift:
+                role_state_residuals = [
+                    torch.roll(
+                        residual,
+                        shifts=int(role_state_unit_shift),
+                        dims=1,
+                    )
+                    for residual in role_state_residuals
+                ]
+            if role_state_injection == "pre_communication":
+                states = [
+                    state + residual
+                    for state, residual in zip(states, role_state_residuals)
+                ]
+            elif role_state_injection != "post_communication":
+                raise ValueError(
+                    "role_state_injection must be pre_communication or "
+                    "post_communication"
+                )
         adjacency = (
             self.learnable_adjacency()
             if finetune
             else self.fixed_adjacency
         )
         messages: torch.Tensor | None = None
+        communication_trace: list[torch.Tensor] = []
         for layer_index in range(len(self.agents[0].layers)):
             outputs = []
             for agent_index, agent in enumerate(self.agents):
@@ -365,7 +613,15 @@ class MAFSAdaptedPower(nn.Module):
                     layer_input = layer_input + messages[agent_index]
                 outputs.append(agent.layers[layer_index](layer_input))
             messages = self.communication(outputs, adjacency)
+            if return_communication_trace:
+                communication_trace.append(messages)
             states = outputs
+
+        if use_role_state and role_state_injection == "post_communication":
+            states = [
+                state + residual
+                for state, residual in zip(states, role_state_residuals)
+            ]
 
         agent_sequences = [
             agent.project(state, encoded[index][1], encoded[index][2])
@@ -384,6 +640,14 @@ class MAFSAdaptedPower(nn.Module):
             gated_states.append(gate * state + (1 - gate) * power_context)
         vote_features = self.vote_over_variables(normalized).squeeze(-1)
         vote_logits = self.vote_over_time(vote_features)
+        route_logits = torch.zeros_like(vote_logits)
+        if use_role_router:
+            if x_role is None or context is None:
+                raise ValueError("role routing requires x_role and context")
+            route_logits = self.role_route_logits(
+                x_role, context, router_input_mode=router_input_mode
+            )
+            vote_logits = vote_logits + route_logits
         vote_weights = torch.softmax(vote_logits, dim=-1)
         stacked_states = torch.stack(gated_states, dim=1)
         combined = (
@@ -399,8 +663,11 @@ class MAFSAdaptedPower(nn.Module):
             "agent_sequences": agent_sequences,
             "adjacency": adjacency,
             "vote_weights": vote_weights,
+            "role_route_logits": route_logits,
             # RMS is diagnostic only. Detaching avoids the undefined gradient
             # of sqrt(x) at the deliberately zero-initialized residual x=0.
             "role_state_rms": role_state_mean_square.detach().sqrt(),
             "role_state_mean_square": role_state_mean_square,
+            "role_state_residuals": role_state_residuals,
+            "communication_trace": communication_trace,
         }

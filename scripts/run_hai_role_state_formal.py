@@ -110,6 +110,8 @@ def main() -> int:
         dropout=float(model_config["dropout"]),
         topology=str(model_config["topology"]),
         role_feature_counts=role_counts,
+        context_size=int(arrays["context"].shape[1]),
+        router_hidden_size=int(model_config["router_hidden_size"]),
         role_state_hidden_size=int(model_config["role_state_hidden_size"]),
     ).to(device)
     checkpoint = checkpoint_dir / f"seed_{args.seed}" / "mafs_maspge_rs"

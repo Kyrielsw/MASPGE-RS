@@ -1,0 +1,55 @@
+{
+  "schema_version": "1.0",
+  "run_name": "smarteole_role_router_full_formal_v1",
+  "experiment": "Full-training-set five-seed MAFS and MASPGE role-router rerun",
+  "dataset": {
+    "path": "data/s1_complete_case_v0.1.npz",
+    "sha256": "6433e89f3a29751eacea375f9cbc7fcd19bceed0dc59c74ddc7a2b27770bd466",
+    "history_steps": 60,
+    "horizon_steps": 15,
+    "target": "mean_normalized_power_over_next_15_steps"
+  },
+  "seeds": [42, 43, 44, 45, 46],
+  "model": {
+    "history_scales": [15, 30, 45, 60],
+    "horizon_scales": [4, 8, 12, 15],
+    "d_model": 64,
+    "n_heads": 4,
+    "layers": 2,
+    "feedforward_size": 128,
+    "dropout": 0.1,
+    "agent_loss_weight": 1.0,
+    "router_hidden_size": 32,
+    "topology": "fully"
+  },
+  "data_loading": {
+    "train_windows": 81188,
+    "validation_windows": 17946,
+    "holdout_windows": 16419,
+    "batch_size": 256,
+    "num_workers": 4,
+    "log_every_batches": 40
+  },
+  "pretrain": {
+    "epochs": 12, "minimum_epochs": 6, "early_stopping_patience": 3,
+    "learning_rate": 0.001, "weight_decay": 0.0001,
+    "gradient_clip_norm": 1.0
+  },
+  "finetune": {
+    "epochs": 8, "minimum_epochs": 4, "early_stopping_patience": 3,
+    "learning_rate": 0.0001, "weight_decay": 0.0001,
+    "gradient_clip_norm": 1.0
+  },
+  "role_router": {
+    "epochs": 40, "minimum_epochs": 10, "early_stopping_patience": 6,
+    "learning_rate": 0.001, "weight_decay": 0.0001,
+    "gradient_clip_norm": 1.0,
+    "route_logit_l2_weight": 0.0001
+  },
+  "protocol": {
+    "architecture_frozen_from": "experiments_035_036",
+    "only_change_from_experiment_035": "train_windows_20000_to_81188",
+    "smarteole_holdout_already_observed": true,
+    "purpose": "environment-consistent reproducibility rerun_not_model_selection"
+  }
+}

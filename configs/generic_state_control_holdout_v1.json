@@ -1,0 +1,20 @@
+{
+  "schema_version": "1.0",
+  "run_name": "generic_state_control_holdout_v1",
+  "phase": "frozen_three_dataset_same_input_generic_state_holdout_report",
+  "seeds": [42, 43, 44, 45, 46],
+  "validation_control": "configs/generic_state_control_validation_v1.json",
+  "validation_result_root": "results/generic_state_control_validation_v1",
+  "generic_checkpoint_root": "checkpoints/generic_state_control_validation_v1",
+  "output_root": "results/generic_state_control_holdout_v1",
+  "protocol": {
+    "training_permitted": false,
+    "checkpoint_selection_permitted": false,
+    "hyperparameter_search_permitted": false,
+    "post_holdout_tuning_permitted": false,
+    "evaluate_all_available_holdout_windows": true,
+    "study_level_holdout_previously_observed": true,
+    "eligible_as_strict_unseen_test": false,
+    "interpretation": "frozen report of validation-selected checkpoints; no model or manuscript claim may be selected from this holdout outcome"
+  }
+}

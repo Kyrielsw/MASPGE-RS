@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "maspge-rs"
-version = "1.0.0"
-description = "Role-conditioned multi-agent forecasting for heterogeneous industrial energy systems"
+version = "1.1.0"
+description = "Unit-wise sensor-state augmented collaborative forecasting for heterogeneous energy systems"
 readme = "README.md"
 requires-python = ">=3.10"
 license = {text = "MIT"}

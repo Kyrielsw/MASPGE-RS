@@ -21,6 +21,7 @@
     "feedforward_size": 128,
     "dropout": 0.1,
     "agent_loss_weight": 1.0,
+    "router_hidden_size": 32,
     "role_state_hidden_size": 16,
     "topology": "fully"
   },

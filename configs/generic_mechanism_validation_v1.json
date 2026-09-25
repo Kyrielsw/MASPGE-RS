@@ -1,0 +1,67 @@
+{
+  "schema_version": "1.0",
+  "run_name": "generic_mechanism_validation_v1",
+  "phase": "five_seed_two_dataset_validation_only_generic_mechanism_controls",
+  "seeds": [42, 43, 44, 45, 46],
+  "holdout_policy": "forbidden",
+  "datasets": {
+    "smarteole": {
+      "experiment_config": "configs/smarteole_role_state_full_validation_v1.json",
+      "loader": "smarteole",
+      "base_checkpoint": "checkpoints/unified_formal_v1/role_router/seed_{seed}/mafs_maspge_full/finetune_best.pt",
+      "generic_state_hidden_size": 31,
+      "generic_state_training_seed_offset": 30000,
+      "expected_data_sha256": "6433e89f3a29751eacea375f9cbc7fcd19bceed0dc59c74ddc7a2b27770bd466",
+      "scenario": "small_gain_power_generation"
+    },
+    "xai4heat": {
+      "experiment_config": "configs/xai4heat_frozen_v1.json",
+      "loader": "xai4heat",
+      "base_checkpoint": "checkpoints/xai4heat_main_validation_v1/seed_{seed}/mafs_base/finetune_best.pt",
+      "generic_state_hidden_size": 35,
+      "generic_state_training_seed_offset": 40000,
+      "expected_data_sha256": "948e69051c991024f7410c1513836c0206dc5c2f33f2a2544654a858c38ccec9",
+      "accepted_platform_data_sha256": [
+        "948e69051c991024f7410c1513836c0206dc5c2f33f2a2544654a858c38ccec9",
+        "0f5d87a007160e46d1e926b272e734ccaf3e50e4664b989e25a519d319bbad71"
+      ],
+      "scenario": "non_electric_district_heating"
+    }
+  },
+  "variants": {
+    "full_zero": {
+      "unit_state_mode": "unitwise",
+      "injection": "pre_communication",
+      "initialization": "zero"
+    },
+    "pooled_broadcast_zero": {
+      "unit_state_mode": "pooled_broadcast",
+      "injection": "pre_communication",
+      "initialization": "zero"
+    },
+    "post_communication_zero": {
+      "unit_state_mode": "unitwise",
+      "injection": "post_communication",
+      "initialization": "zero"
+    },
+    "full_small_random": {
+      "unit_state_mode": "unitwise",
+      "injection": "pre_communication",
+      "initialization": "small_random",
+      "initialization_std": 0.001
+    }
+  },
+  "protocol": {
+    "selection_split": "validation_only",
+    "selection_metric": "joint training-standardized validation MSE",
+    "same_sensors": true,
+    "same_seed_specific_mafs_checkpoint": true,
+    "same_training_budget": true,
+    "same_early_stopping_rule": true,
+    "exact_parameter_match_across_variants": true,
+    "post_communication_definition": "inject after the frozen specialist/message-passing stack and before context gating, voting, and forecast projection",
+    "pooled_definition": "mean standardized sensor histories over physical units and broadcast the shared history back to every unit before the shared GRU encoder",
+    "small_random_definition": "Normal(0, 1e-3) residual-projection weights and zero biases; all other initialization and training seeds match full_zero",
+    "test_evaluation": "not part of this experiment"
+  }
+}

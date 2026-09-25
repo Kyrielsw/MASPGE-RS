@@ -119,8 +119,12 @@ def evaluate(
     loading: dict,
     device: torch.device,
     target_scale: float,
+    use_role_router: bool = False,
+    router_input_mode: str = "full",
     use_role_state: bool = False,
     role_state_ablation_mode: str = "full",
+    generic_state_mode: str = "unitwise",
+    role_state_injection: str = "pre_communication",
 ) -> dict:
     loader = make_loader(dataset, loading=loading, device=device, shuffle=False, seed=0)
     predictions = []
@@ -132,6 +136,8 @@ def evaluate(
     vote_sum = None
     vote_count = 0
     last_adjacency = None
+    route_square_sum = 0.0
+    route_count = 0
     role_state_square_sum = 0.0
     role_state_count = 0
     model.eval()
@@ -142,8 +148,13 @@ def evaluate(
                 batch["power_history"],
                 finetune=finetune,
                 x_role=batch["x_role"],
+                context=batch["context"],
+                use_role_router=use_role_router,
+                router_input_mode=router_input_mode,
                 use_role_state=use_role_state,
                 role_state_ablation_mode=role_state_ablation_mode,
+                generic_state_mode=generic_state_mode,
+                role_state_injection=role_state_injection,
             )
             sequence = output["final_sequence"]
             target_sequence = batch["power_future_sequence"]
@@ -163,6 +174,9 @@ def evaluate(
             vote_sum = current_sum if vote_sum is None else vote_sum + current_sum
             vote_count += votes.shape[0]
             last_adjacency = output["adjacency"].detach().cpu()
+            route_logits = output["role_route_logits"]
+            route_square_sum += float(route_logits.square().sum())
+            route_count += route_logits.numel()
             role_state_square_sum += (
                 float(output["role_state_mean_square"].detach())
                 * votes.shape[0]
@@ -190,6 +204,9 @@ def evaluate(
         "sequence_mae_standardized": sequence_absolute_sum / sequence_count,
         "mean_agent_vote_weights": (vote_sum / vote_count).tolist(),
         "agent_adjacency": last_adjacency.tolist(),
+        "role_route_rms": (
+            (route_square_sum / route_count) ** 0.5 if route_count else 0.0
+        ),
         "role_state_rms": (
             (role_state_square_sum / role_state_count) ** 0.5
             if role_state_count else 0.0
@@ -215,9 +232,14 @@ def train_stage(
     target_scale: float,
     device: torch.device,
     checkpoint_path: Path,
+    use_role_router: bool = False,
+    route_logit_l2_weight: float = 0.0,
+    router_input_mode: str = "full",
     use_role_state: bool = False,
     role_state_l2_weight: float = 0.0,
     role_state_ablation_mode: str = "full",
+    generic_state_mode: str = "unitwise",
+    role_state_injection: str = "pre_communication",
 ) -> tuple[dict, list[dict]]:
     parameters = [parameter for parameter in model.parameters() if parameter.requires_grad]
     optimizer = torch.optim.AdamW(
@@ -243,8 +265,13 @@ def train_stage(
                 batch["power_history"],
                 finetune=finetune,
                 x_role=batch["x_role"],
+                context=batch["context"],
+                use_role_router=use_role_router,
+                router_input_mode=router_input_mode,
                 use_role_state=use_role_state,
                 role_state_ablation_mode=role_state_ablation_mode,
+                generic_state_mode=generic_state_mode,
+                role_state_injection=role_state_injection,
             )
             sequence_error = (
                 output["final_sequence"] - batch["power_future_sequence"]
@@ -256,10 +283,12 @@ def train_stage(
                 target = batch["power_future_sequence"][:, :horizon]
                 valid = batch["power_future_valid"][:, :horizon].bool()
                 agent_loss = agent_loss + (sequence - target).square()[valid].mean()
+            route_penalty = output["role_route_logits"].square().mean()
             role_state_penalty = output["role_state_mean_square"]
             objective = (
                 final_loss
                 + agent_loss_weight * agent_loss
+                + route_logit_l2_weight * route_penalty
                 + role_state_l2_weight * role_state_penalty
             )
             if not torch.isfinite(objective):
@@ -282,8 +311,12 @@ def train_stage(
             loading=loading,
             device=device,
             target_scale=target_scale,
+            use_role_router=use_role_router,
+            router_input_mode=router_input_mode,
             use_role_state=use_role_state,
             role_state_ablation_mode=role_state_ablation_mode,
+            generic_state_mode=generic_state_mode,
+            role_state_injection=role_state_injection,
         )
         validation_mse = validation["metrics"]["mse_standardized"]
         curve.append(

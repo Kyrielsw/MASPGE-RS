@@ -192,6 +192,63 @@ def load_frozen_hai(
     return arrays
 
 
+def load_frozen_xai4heat(
+    path: Path,
+    *,
+    expected_sha256: str | None = None,
+) -> dict[str, np.ndarray]:
+    """Load the frozen five-substation XAI4HEAT forecasting contract."""
+
+    if not path.is_file():
+        raise FileNotFoundError(
+            f"Processed XAI4HEAT dataset not found: {path}. "
+            "Run scripts/prepare_xai4heat.py first."
+        )
+    actual_sha256 = sha256_file(path)
+    if expected_sha256 and actual_sha256 != expected_sha256:
+        raise RuntimeError(
+            "XAI4HEAT dataset SHA256 mismatch. "
+            f"expected={expected_sha256}, actual={actual_sha256}"
+        )
+    with np.load(path, allow_pickle=False) as archive:
+        arrays = {name: archive[name] for name in archive.files}
+    required = {
+        "dataset_id", "x_role", "context", "power", "power_valid",
+        "train_end_indices", "validation_end_indices", "holdout_end_indices",
+        "feature_slot_mask", "role_feature_counts", "active_role_mask",
+        "target_scale", "target_mean", "coordinate_xy", "unit_names",
+        "timestamps", "season_ids",
+    }
+    missing = required.difference(arrays)
+    if missing:
+        raise RuntimeError(
+            f"Processed XAI4HEAT dataset is missing arrays: {sorted(missing)}"
+        )
+    if str(arrays["dataset_id"].item()) != "xai4heat_scada_2024_generic_v1":
+        raise RuntimeError(f"Unexpected XAI4HEAT dataset_id: {arrays['dataset_id']}")
+    time_steps = arrays["power"].shape[0]
+    if arrays["power"].shape != (time_steps, 5):
+        raise RuntimeError(f"Unexpected XAI4HEAT power shape: {arrays['power'].shape}")
+    if arrays["x_role"].shape != (time_steps, 5, 1, 7):
+        raise RuntimeError(f"Unexpected XAI4HEAT state shape: {arrays['x_role'].shape}")
+    if arrays["power_valid"].shape != arrays["power"].shape:
+        raise RuntimeError("XAI4HEAT power_valid must align with power")
+    if arrays["role_feature_counts"].tolist() != [7]:
+        raise RuntimeError("XAI4HEAT generic state must expose one seven-value bin")
+    if arrays["feature_slot_mask"].shape != (5, 1, 7):
+        raise RuntimeError("XAI4HEAT feature_slot_mask must have shape [5,1,7]")
+    previous_last = -1
+    for split in ("train_end_indices", "validation_end_indices", "holdout_end_indices"):
+        indices = arrays[split]
+        if indices.ndim != 1 or len(indices) == 0:
+            raise RuntimeError(f"XAI4HEAT split is empty or malformed: {split}")
+        if int(indices[0]) <= previous_last:
+            raise RuntimeError("XAI4HEAT season splits must be chronological and disjoint")
+        previous_last = int(indices[-1])
+    arrays["sha256"] = np.asarray(actual_sha256)
+    return arrays
+
+
 class SmarteoleWindowDataset(Dataset):
     """Run-safe views over arrays produced by the accepted S1 pipeline."""
 

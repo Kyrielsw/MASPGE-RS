@@ -1,7 +1,10 @@
 # Data contracts
 
 Raw and processed datasets are excluded from Git. The repository stores only
-preprocessing code, role contracts, expected hashes, and verification tools.
+preprocessing code, storage contracts, expected hashes, and verification tools.
+Some earlier contracts retain an A1--A4 slot axis. The current Generic Unit
+State model flattens the available slots and does not use those labels as
+functional-role semantics.
 
 ## SMARTEOLE
 
@@ -36,6 +39,16 @@ See [SDWPF_README.md](SDWPF_README.md) for raw hashes and the exact command.
 
 See [HAI_README.md](HAI_README.md) for admission auditing, preprocessing, and
 the no-cross-file-window contract.
+
+## XAI4HEAT
+
+- Source: [Mendeley Data record](https://data.mendeley.com/datasets/2mwc6x6kwb/1)
+- Processed file: `data/xai4heat_scada_2024_generic_v1.npz`
+- Physical units: five district-heating substations
+- Model input: direct generic per-station sensor tensor; no A1--A4 partition
+
+See [XAI4HEAT_README.md](XAI4HEAT_README.md) for the expected archive path,
+preparation command, and data-licensing boundary.
 
 ## Leakage boundary
 

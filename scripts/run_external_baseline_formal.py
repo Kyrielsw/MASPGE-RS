@@ -17,7 +17,7 @@ from run_external_baseline_screen import (
     log,
     run_mode,
 )
-from maspge.data import load_frozen_hai, load_frozen_sdwpf
+from maspge.data import load_frozen_hai, load_frozen_sdwpf, load_frozen_xai4heat
 
 
 def parse_args() -> argparse.Namespace:
@@ -78,6 +78,10 @@ def main() -> int:
         )
     elif loader_name == "hai":
         arrays = load_frozen_hai(
+            data_path, expected_sha256=config["dataset"].get("sha256")
+        )
+    elif loader_name == "xai4heat":
+        arrays = load_frozen_xai4heat(
             data_path, expected_sha256=config["dataset"].get("sha256")
         )
     else:

@@ -1,3 +1,3 @@
-"""MASPGE-RS: role-conditioned multi-agent energy forecasting."""
+"""MASPGE-RS: generic unit-state collaborative energy forecasting."""
 
-__version__ = "1.0.0"
+__version__ = "1.1.0"

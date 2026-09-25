@@ -362,6 +362,92 @@ class ITransformerFullInfoAdapted(nn.Module):
         return y_current + delta
 
 
+class ITransformerInputMatchedAdapted(nn.Module):
+    """Project-adapted iTransformer-style forecaster with MASPGE inputs.
+
+    Each physical unit is a token containing its complete target and sensor
+    history.  The storage role axis is only flattened; no role-specific
+    encoder or A1--A4 meaning is used.  This is deliberately labelled an
+    adapted project baseline rather than the authors' official architecture.
+    """
+
+    def __init__(
+        self,
+        *,
+        history_steps: int,
+        horizon_steps: int,
+        role_feature_counts: tuple[int, ...],
+        d_model: int,
+        n_heads: int,
+        layers: int,
+        feedforward_size: int,
+        dropout: float,
+    ) -> None:
+        super().__init__()
+        self.history_steps = int(history_steps)
+        self.horizon_steps = int(horizon_steps)
+        self.role_feature_counts = tuple(int(v) for v in role_feature_counts)
+        sensor_count = sum(self.role_feature_counts)
+        if sensor_count < 1:
+            raise ValueError("at least one historical sensor is required")
+        self.sensor_count = sensor_count
+        self.embedding = nn.Linear(
+            self.history_steps * (1 + sensor_count), d_model
+        )
+        encoder_layer = nn.TransformerEncoderLayer(
+            d_model=d_model,
+            nhead=n_heads,
+            dim_feedforward=feedforward_size,
+            dropout=dropout,
+            activation="gelu",
+            batch_first=True,
+            norm_first=True,
+        )
+        self.encoder = nn.TransformerEncoder(
+            encoder_layer, num_layers=layers, enable_nested_tensor=False
+        )
+        self.head = nn.Linear(d_model, self.horizon_steps)
+
+    def flatten_sensors(self, x_role: torch.Tensor) -> torch.Tensor:
+        if x_role.ndim != 5:
+            raise ValueError("x_role must have shape [B,H,U,R,F]")
+        if x_role.shape[3] != len(self.role_feature_counts):
+            raise ValueError("storage slot count does not match frozen contract")
+        parts = [
+            x_role[:, :, :, role, :count]
+            for role, count in enumerate(self.role_feature_counts)
+            if count > 0
+        ]
+        return torch.nan_to_num(torch.cat(parts, dim=-1))
+
+    def forward(
+        self,
+        *,
+        x_role: torch.Tensor,
+        power_history: torch.Tensor,
+        **_: torch.Tensor,
+    ) -> torch.Tensor:
+        if power_history.shape[1] != self.history_steps:
+            raise ValueError("power history length differs from frozen protocol")
+        sensors = self.flatten_sensors(x_role)
+        if sensors.shape[:3] != power_history.shape:
+            raise ValueError("sensor and target history axes must align")
+        mean = power_history.mean(dim=1, keepdim=True).detach()
+        centered = power_history - mean
+        scale = (
+            centered.var(dim=1, keepdim=True, unbiased=False) + 1e-5
+        ).sqrt().detach()
+        normalized_target = centered / scale
+        sequence = torch.cat([normalized_target.unsqueeze(-1), sensors], dim=-1)
+        batch, steps, units, features = sequence.shape
+        tokens = sequence.permute(0, 2, 1, 3).reshape(
+            batch, units, steps * features
+        )
+        normalized_future = self.head(self.encoder(self.embedding(tokens)))
+        future = normalized_future.transpose(1, 2)
+        return future * scale + mean
+
+
 class STAR(nn.Module):
     """Series-Core Aggregate-Redistribute module from SOFTS.
 

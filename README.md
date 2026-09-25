@@ -4,9 +4,13 @@
 Heterogeneous Energy Systems**
 
 MASPGE-RS is a PyTorch implementation for collaborative forecasting across
-multiple physical units. This repository provides data preparation tools,
-training and evaluation entry points, baseline implementations, and
-reproducible launchers for SMARTEOLE, SDWPF, and HAI 23.05.
+multiple physical units. The current main model augments a cooperative
+multi-agent temporal backbone with a generic, unit-wise sensor-state encoder
+and a residual injected before agent communication. It does not require a
+shared A1--A4 role vocabulary across datasets. This repository provides data
+preparation tools, training and evaluation entry points, baseline
+implementations, and reproducible launchers for SMARTEOLE, SDWPF, HAI 23.05,
+and XAI4HEAT.
 
 ## Repository layout
 
@@ -113,6 +117,17 @@ python scripts/verify_hai_role_state_setup.py
 See [`data/HAI_README.md`](data/HAI_README.md) for the admission audit and raw
 directory structure.
 
+### XAI4HEAT
+
+Download the public XAI4HEAT archive following
+[`data/XAI4HEAT_README.md`](data/XAI4HEAT_README.md), then create and verify
+the five-station generic-state contract:
+
+```bash
+python -u scripts/prepare_xai4heat.py
+python scripts/verify_xai4heat_setup.py
+```
+
 ## Quick smoke tests
 
 Run the automated tests before training:
@@ -132,18 +147,14 @@ CUDA_VISIBLE_DEVICES=0 python -u scripts/run_mafs_base.py \
   --smoke
 ```
 
-Check the complete HAI training path:
-
-```bash
-CUDA_VISIBLE_DEVICES=0 python -u scripts/run_hai_role_state_formal.py \
-  --seed 42 \
-  --device cuda \
-  --smoke \
-  2>&1 | tee logs/hai_role_state_smoke_seed42.log
-```
-
 Use `--device cpu` for a CPU-only structural check. Smoke outputs are stored in
 separate directories and are not used by full runs.
+
+Check the XAI4HEAT generic-state path:
+
+```bash
+bash scripts/run_xai4heat_smoke.sh
+```
 
 ## Training
 
@@ -165,20 +176,24 @@ CUDA_VISIBLE_DEVICES=0 python -u scripts/run_mafs_base.py \
   --resume
 ```
 
-### Stage 2: state-augmented models
+### Stage 2: generic unit-state model
 
-After preparing the datasets and required base checkpoints, run the
-dataset-specific validation launchers:
+The paper's current main adapter is `PerUnitGenericStateAdapter`. It flattens
+the available sensor slots into a generic per-unit feature sequence, shares an
+encoder across physical units, and injects a zero-initialized residual before
+agent communication. It does not create A1--A4-specific encoders or require a
+common role vocabulary.
+
+For the first three datasets, historical preprocessing files retain a slot
+axis for backward-compatible storage. That axis is flattened before entering
+the current adapter and is not used as functional-role semantics. XAI4HEAT
+uses a direct station-level generic sensor tensor.
+
+After preparing the datasets and seed-matched base checkpoints, run the
+five-seed validation launcher:
 
 ```bash
-# SMARTEOLE
-bash scripts/run_role_state_full_validation_2gpu.sh
-
-# SDWPF
-bash scripts/run_sdwpf_role_state_formal_2gpu.sh
-
-# HAI 23.05
-bash scripts/run_hai_role_state_validation_2gpu.sh
+bash scripts/run_generic_state_control_validation_2gpu.sh
 ```
 
 The launchers distribute five seeds between `CUDA_VISIBLE_DEVICES=0` and
@@ -189,8 +204,8 @@ For a long-running job, redirect the master output while retaining the
 per-GPU logs created by the launcher:
 
 ```bash
-nohup bash scripts/run_hai_role_state_validation_2gpu.sh \
-  > logs/hai_role_state_validation_master.log 2>&1 &
+nohup bash scripts/run_generic_state_control_validation_2gpu.sh \
+  > logs/generic_state_control_validation_master.log 2>&1 &
 
 echo $!
 tail -f logs/hai_role_state_validation_master.log
@@ -203,18 +218,38 @@ its selected checkpoints unchanged, and then use the matching read-only
 evaluation launcher:
 
 ```bash
-# SMARTEOLE
-bash scripts/run_role_state_holdout_2gpu.sh
-
-# SDWPF
-bash scripts/run_sdwpf_role_state_holdout_2gpu.sh
-
-# HAI 23.05
-bash scripts/run_hai_role_state_holdout_2gpu.sh
+bash scripts/run_generic_state_control_holdout_2gpu.sh
 ```
 
 The evaluation scripts load frozen checkpoints and do not contain an optimizer
 or training path.
+
+### XAI4HEAT main experiment
+
+The XAI4HEAT workflow trains the cooperative backbone and generic unit-state
+adapter on the frozen chronological seasons, then evaluates the selected
+checkpoints separately:
+
+```bash
+bash scripts/run_xai4heat_validation_2gpu.sh
+bash scripts/run_xai4heat_holdout_2gpu.sh
+```
+
+### Same-input forecasting control
+
+`iTransformer-InputMatched (adapted)` receives the same historical target and
+generic per-unit sensors as the main model. It is a project adaptation, not an
+official implementation from the iTransformer authors. Audit and run it with:
+
+```bash
+python scripts/verify_itransformer_input_matched_setup.py
+bash scripts/run_itransformer_input_matched_smoke.sh
+bash scripts/run_itransformer_input_matched_validation_2gpu.sh
+bash scripts/run_itransformer_input_matched_holdout_2gpu.sh
+```
+
+The holdout launcher refuses to run until all four-dataset, five-seed
+validation records exist.
 
 ## Optional workflows
 
@@ -232,6 +267,10 @@ scripts/run_timemixer_holdout_2gpu.sh                 Frozen TimeMixer evaluatio
 
 Check the corresponding configuration under `configs/` before launching an
 optional workflow.
+
+Role-partitioned adapters and routing scripts are retained only for historical
+compatibility and structural controls. Their outputs are not the current
+Generic Unit State main model.
 
 ## Outputs
 

@@ -1,0 +1,43 @@
+{
+  "schema_version": "1.0",
+  "run_name": "generic_state_control_validation_v1",
+  "phase": "five_seed_three_dataset_validation_only_same_input_generic_state_control",
+  "seeds": [42, 43, 44, 45, 46],
+  "holdout_policy": "forbidden_during_validation_control",
+  "datasets": {
+    "smarteole": {
+      "experiment_config": "configs/smarteole_role_state_full_validation_v1.json",
+      "base_checkpoint": "checkpoints/unified_formal_v1/role_router/seed_{seed}/mafs_maspge_full/finetune_best.pt",
+      "full_checkpoint": "checkpoints/role_state_v1_full_validation/seed_{seed}/role_state/best.pt",
+      "generic_state_hidden_size": 31,
+      "training_seed_offset": 30000
+    },
+    "sdwpf": {
+      "experiment_config": "configs/sdwpf_role_state_formal_v1.json",
+      "base_checkpoint": "checkpoints/sdwpf_role_router_formal_v1/seed_{seed}/mafs_role_router_full/finetune_best.pt",
+      "full_checkpoint": "checkpoints/sdwpf_role_state_formal_v1/seed_{seed}/role_state/best.pt",
+      "generic_state_hidden_size": 31,
+      "training_seed_offset": 40000
+    },
+    "hai": {
+      "experiment_config": "configs/hai_role_state_formal_v1.json",
+      "base_checkpoint": "checkpoints/hai_role_state_formal_v1/seed_{seed}/mafs_maspge_rs/finetune_best.pt",
+      "full_checkpoint": "checkpoints/hai_role_state_formal_v1/seed_{seed}/mafs_maspge_rs/role_state_best.pt",
+      "generic_state_hidden_size": 35,
+      "training_seed_offset": 40000
+    }
+  },
+  "protocol": {
+    "same_sensor_values": true,
+    "same_unit_axis": true,
+    "same_history_scales": true,
+    "same_precommunication_zero_initialized_residual": true,
+    "same_frozen_mafs_backbone": true,
+    "same_training_schedule": true,
+    "generic_encoder": "one GRU per MAFS scale over all valid sensors concatenated within each physical unit",
+    "role_specific_encoders": false,
+    "parameter_matching": "closest integer GRU hidden size with absolute adapter difference below one percent",
+    "hyperparameter_search": false,
+    "post_holdout_tuning": false
+  }
+}
